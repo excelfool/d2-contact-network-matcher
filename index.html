@@ -1,0 +1,1009 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ACLI Network Matcher</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,900&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+
+  :root {
+    --ink: #16130f;
+    --paper: #f4efe6;
+    --paper2: #ebe3d4;
+    --accent: #b3471f;
+    --accent2: #3a6b54;
+    --gold: #c08a2d;
+    --line: #d6cbb6;
+    --shadow: rgba(40,30,15,0.12);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--paper);
+    background-image: radial-gradient(circle at 15% 10%, rgba(179,71,31,0.05), transparent 40%),
+                      radial-gradient(circle at 85% 90%, rgba(58,107,84,0.05), transparent 40%);
+    color: var(--ink);
+    font-family: 'IBM Plex Sans', sans-serif;
+    line-height: 1.5;
+    padding: 32px 20px 80px;
+    min-height: 100vh;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+
+  header { border-bottom: 3px double var(--ink); padding-bottom: 20px; margin-bottom: 28px; }
+  .kicker { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.28em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
+  h1 { font-family: 'Fraunces', serif; font-weight: 900; font-size: clamp(30px, 5vw, 52px); line-height: 0.98; letter-spacing: -0.01em; }
+  h1 em { font-style: italic; color: var(--accent); }
+  .sub { font-size: 15px; max-width: 620px; margin-top: 12px; color: #4a4338; }
+
+  .panel { background: var(--paper2); border: 1px solid var(--line); border-radius: 4px; padding: 24px; margin-bottom: 24px; box-shadow: 0 2px 0 var(--shadow); }
+  .panel h2 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 21px; margin-bottom: 6px; display: flex; align-items: baseline; gap: 10px; }
+  .stepnum { font-family: 'IBM Plex Mono', monospace; font-size: 12px; background: var(--ink); color: var(--paper); width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; flex: none; }
+  .panel p.hint { font-size: 13.5px; color: #5a5246; margin-bottom: 16px; }
+
+  .drop { border: 2px dashed var(--line); border-radius: 6px; padding: 38px 20px; text-align: center; cursor: pointer; transition: all 0.2s; background: rgba(255,255,255,0.35); }
+  .drop:hover, .drop.over { border-color: var(--accent); background: rgba(179,71,31,0.04); }
+  .drop strong { font-family: 'Fraunces', serif; font-size: 18px; display: block; margin-bottom: 4px; }
+  .drop span { font-size: 13px; color: #6a6256; font-family: 'IBM Plex Mono', monospace; }
+  input[type=file] { display: none; }
+
+  .controls { display: flex; flex-wrap: wrap; gap: 14px 28px; align-items: center; margin-top: 4px; }
+  .ctl { display: flex; flex-direction: column; gap: 5px; }
+  .ctl label { font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: #6a6256; }
+  .ctl input[type=range] { width: 180px; accent-color: var(--accent); }
+  .ctl .val { font-family: 'Fraunces', serif; font-weight: 600; font-size: 15px; }
+  .searchbox { flex: 1; min-width: 200px; }
+  .searchbox input { width: 100%; padding: 9px 12px; border: 1px solid var(--line); border-radius: 4px; background: #fff; font-family: 'IBM Plex Sans'; font-size: 14px; }
+  .searchbox input:focus { outline: 2px solid var(--accent); border-color: transparent; }
+
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px,1fr)); gap: 14px; margin: 22px 0; }
+  .stat { background: #fff; border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 3px; padding: 14px 16px; }
+  .stat .n { font-family: 'Fraunces', serif; font-weight: 900; font-size: 30px; line-height: 1; color: var(--ink); }
+  .stat .l { font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: #6a6256; margin-top: 6px; }
+  .stat.green { border-left-color: var(--accent2); }
+  .stat.gold { border-left-color: var(--gold); }
+
+  table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+  thead th { background: var(--ink); color: var(--paper); font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; text-align: left; padding: 11px 14px; cursor: pointer; user-select: none; white-space: nowrap; }
+  thead th:hover { background: #2a241c; }
+  thead th .ar { opacity: 0.5; font-size: 9px; }
+  tbody td { padding: 10px 14px; border-top: 1px solid var(--line); font-size: 13.5px; vertical-align: top; }
+  tbody tr:hover { background: rgba(179,71,31,0.035); }
+  .name { font-weight: 600; }
+  .match-co { color: var(--accent2); font-weight: 500; }
+  .badge { font-family: 'IBM Plex Mono', monospace; font-size: 11px; padding: 2px 8px; border-radius: 20px; white-space: nowrap; font-weight: 500; }
+  .b1 { background: #d8ecd9; color: #2a5a3a; }
+  .conf { font-family: 'IBM Plex Mono', monospace; font-size: 11px; }
+  .conf-bar { display: inline-block; height: 6px; border-radius: 3px; background: var(--accent2); vertical-align: middle; margin-left: 6px; }
+  .empty { text-align: center; padding: 50px 20px; color: #8a8275; font-family: 'IBM Plex Mono', monospace; font-size: 13px; }
+  .btn { font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; padding: 9px 16px; border: 1px solid var(--ink); background: var(--ink); color: var(--paper); border-radius: 4px; cursor: pointer; transition: all 0.15s; }
+  .btn:hover { background: var(--accent); border-color: var(--accent); }
+  .btn.ghost { background: transparent; color: var(--ink); }
+  .btn.ghost:hover { background: var(--ink); color: var(--paper); }
+  .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+  .toolbar .left { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #6a6256; }
+  .hidden { display: none; }
+  .note { font-size: 12px; color: #6a6256; font-family: 'IBM Plex Mono', monospace; margin-top: 14px; padding-top: 14px; border-top: 1px dotted var(--line); }
+  details { margin-top: 10px; }
+  summary { cursor: pointer; font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--accent); }
+  details ul { margin: 8px 0 0 18px; font-size: 13px; }
+  details li { margin-bottom: 4px; }
+  a { color: var(--accent); }
+  .linkcell a { font-family: 'IBM Plex Mono', monospace; font-size: 11px; text-decoration: none; border-bottom: 1px solid var(--accent); }
+
+  .cov { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap: 14px; margin-bottom: 24px; }
+  .cov .card { background: #fff; border: 1px solid var(--line); border-radius: 3px; padding: 16px; }
+  .cov .card .big { font-family: 'Fraunces', serif; font-weight: 900; font-size: 34px; line-height: 1; }
+  .cov .card .lbl { font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: #6a6256; margin-top: 6px; }
+  .cov .card.reach { border-top: 4px solid var(--accent2); }
+  .cov .card.gap { border-top: 4px solid var(--accent); }
+  .cov .bar { height: 10px; border-radius: 5px; background: var(--paper2); overflow: hidden; margin-top: 10px; border: 1px solid var(--line); }
+  .cov .bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--accent2), var(--gold)); }
+
+  .picker { background: #fff; border: 1px solid var(--line); border-radius: 4px; padding: 18px; margin-bottom: 22px; }
+  .picker-head strong { font-family: 'Fraunces', serif; font-size: 17px; }
+  .hint2 { display: block; font-size: 12.5px; color: #6a6256; margin-top: 3px; }
+  .picker-controls { display: flex; gap: 12px; margin: 14px 0; flex-wrap: wrap; }
+  .picker-controls input { flex: 1; min-width: 200px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 4px; font-family: 'IBM Plex Sans'; font-size: 14px; }
+  .picker-controls select { padding: 9px 12px; border: 1px solid var(--line); border-radius: 4px; font-family: 'IBM Plex Mono', monospace; font-size: 12px; background: var(--paper); cursor: pointer; }
+  .picker-controls input:focus, .picker-controls select:focus { outline: 2px solid var(--accent); border-color: transparent; }
+  .firmlist { max-height: 280px; overflow-y: auto; border: 1px solid var(--line); border-radius: 3px; }
+  .firmrow { display: flex; align-items: center; gap: 12px; padding: 9px 14px; border-bottom: 1px solid var(--line); font-size: 13.5px; cursor: pointer; transition: background 0.12s; }
+  .firmrow:last-child { border-bottom: none; }
+  .firmrow:hover { background: rgba(179,71,31,0.04); }
+  .firmrow input { accent-color: var(--accent); width: 16px; height: 16px; flex: none; cursor: pointer; }
+  .firmrow .fn { flex: 1; }
+  .firmrow .tag { font-family: 'IBM Plex Mono', monospace; font-size: 10px; padding: 2px 8px; border-radius: 12px; white-space: nowrap; }
+  .tag-reach { background: #d8ecd9; color: #2a5a3a; }
+  .tag-gap { background: #f0ded5; color: #94462a; }
+  .firmlist .none { padding: 20px; text-align: center; color: #8a8275; font-family: 'IBM Plex Mono', monospace; font-size: 12px; }
+
+  #wlBody td { font-size: 13px; }
+  .srch-link { font-family: 'IBM Plex Mono', monospace; font-size: 11px; background: var(--ink); color: var(--paper); padding: 6px 11px; border-radius: 4px; text-decoration: none; white-space: nowrap; display: inline-block; transition: background 0.12s; }
+  .srch-link:hover { background: var(--accent); }
+  .wl-note { width: 100%; border: 1px solid var(--line); border-radius: 3px; padding: 6px 8px; font-family: 'IBM Plex Sans'; font-size: 12.5px; min-height: 34px; resize: vertical; }
+  .wl-rm { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 16px; line-height: 1; }
+  .wl-rm:hover { color: #7a2d12; }
+  .foothold-yes { color: var(--accent2); font-weight: 600; }
+  .foothold-no { color: #94462a; font-style: italic; }
+
+  .co-inputs { display: flex; gap: 18px; align-items: stretch; margin-top: 4px; }
+  .co-col { flex: 1; display: flex; }
+  .co-drop { width: 100%; padding: 24px 16px; }
+  .co-or { display: flex; align-items: center; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #8a8275; text-transform: uppercase; letter-spacing: 0.1em; }
+  #coPaste { width: 100%; min-height: 120px; padding: 12px; border: 1px solid var(--line); border-radius: 6px; background: rgba(255,255,255,0.35); font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; line-height: 1.5; resize: vertical; }
+  #coPaste:focus { outline: 2px solid var(--accent); border-color: transparent; }
+  .co-actions { display: flex; gap: 12px; align-items: center; margin-top: 16px; flex-wrap: wrap; }
+  .co-status { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--accent2); }
+  .co-status.warn { color: var(--accent); }
+  @media (max-width: 640px){ .co-inputs { flex-direction: column; } .co-or { justify-content: center; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="kicker" id="kicker">Network Intelligence · Match your contacts to any company list</div>
+    <h1>Who do you <em>already</em> know<br><span id="targetLabel">at these companies?</span></h1>
+    <p class="sub">Two inputs, three stages. First load a list of target companies (or use the built-in ACLI insurer roster). Then drop in your LinkedIn connections export — Stage 2 maps every 1st-degree contact against that list, fuzzy-matching name variants like "MassMutual" to "Massachusetts Mutual Life Insurance Company." Stage 3 shows where your network has gaps and generates one-click 2nd-degree searches for the firms you want to break into. Everything runs in your browser; nothing is uploaded anywhere.</p>
+  </header>
+
+  <div class="panel">
+    <h2><span class="stepnum">1</span> Load your target company list</h2>
+    <p class="hint">Choose one: upload a file (<code>.txt</code> or <code>.csv</code>, one company per line — or a CSV with a column of company names), paste a list, or use the built-in ACLI roster. Got a Word <code>.docx</code>? Open it, copy the names, and paste them below — browsers can't read .docx directly.</p>
+    <div class="co-inputs">
+      <div class="co-col">
+        <div class="drop co-drop" id="coDrop">
+          <strong>Drop a .txt or .csv list here</strong>
+          <span>or click to choose a file</span>
+        </div>
+        <input type="file" id="coFile" accept=".csv,.txt,text/csv,text/plain">
+      </div>
+      <div class="co-or">or</div>
+      <div class="co-col">
+        <textarea id="coPaste" placeholder="Paste company names here, one per line…&#10;Acme Insurance Company&#10;Globex Financial&#10;Initech Life"></textarea>
+      </div>
+    </div>
+    <div class="co-actions">
+      <button class="btn" id="coUseList">Use this list</button>
+      <button class="btn ghost" id="coUseAcli">Use built-in ACLI roster (275 firms)</button>
+      <span id="coStatus" class="co-status"></span>
+    </div>
+  </div>
+
+  <div class="panel hidden" id="connPanel">
+    <h2><span class="stepnum">2</span> Load your connections file</h2>
+    <p class="hint">Use the <code>Connections.csv</code> from your LinkedIn data export (instructions are in the chat). CSV columns expected: First Name, Last Name, Company, Position, URL. Other layouts are auto-detected.</p>
+    <div class="drop" id="drop">
+      <strong>Drop Connections.csv here</strong>
+      <span>or click to choose a file</span>
+    </div>
+    <input type="file" id="file" accept=".csv,text/csv">
+  </div>
+
+  <div class="panel hidden" id="resultsPanel">
+    <h2><span class="stepnum">3</span> Your matches</h2>
+    <div class="controls">
+      <div class="ctl">
+        <label>Match strictness</label>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <input type="range" id="thresh" min="55" max="100" value="80">
+          <span class="val" id="threshVal">80%</span>
+        </div>
+      </div>
+      <div class="searchbox">
+        <input type="text" id="filter" placeholder="Filter by name, company, or title…">
+      </div>
+    </div>
+
+    <div class="stats" id="stats"></div>
+
+    <div class="toolbar">
+      <div class="left" id="count"></div>
+      <button class="btn ghost" id="export">⬇ Export matches as CSV</button>
+    </div>
+
+    <table id="tbl">
+      <thead>
+        <tr>
+          <th data-k="name">Contact <span class="ar">⇅</span></th>
+          <th data-k="rawCompany">Their company (from LinkedIn) <span class="ar">⇅</span></th>
+          <th data-k="matchCompany">Matched company <span class="ar">⇅</span></th>
+          <th data-k="score">Match <span class="ar">⇅</span></th>
+          <th data-k="position">Title <span class="ar">⇅</span></th>
+          <th data-k="degree">Degree <span class="ar">⇅</span></th>
+          <th>Open</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+    <div class="empty hidden" id="noMatch">No contacts cleared the match threshold. Try lowering strictness.</div>
+
+    <div class="note">
+      Every contact in a LinkedIn export is a <strong>1st-degree</strong> connection — the group you can message directly, so this is your highest-value tier. For <strong>2nd-degree</strong> at companies you can't reach yet, scroll to Stage 4 below, which turns these results into a coverage map and one-click LinkedIn searches.
+      <details>
+        <summary>How matching works</summary>
+        <ul>
+          <li>Both your contact's company and each company on your list are normalized — lowercased, and boilerplate like "Life Insurance Company", "Corp.", "Inc.", "of New York", "The", and punctuation are stripped.</li>
+          <li>A token-overlap + sequence-similarity score (0–100%) is computed against every company on your list; the best match above your threshold wins.</li>
+          <li>Raise strictness to cut false positives (e.g. a generic "National Life" matching the wrong firm); lower it to catch heavily abbreviated entries.</li>
+        </ul>
+      </details>
+    </div>
+  </div>
+
+  <div class="panel hidden" id="stage3">
+    <h2><span class="stepnum">4</span> 2nd-degree spot-check &amp; coverage map</h2>
+    <p class="hint">Your export only contains 1st-degree contacts. To reach the companies you <em>don't</em> already have a foothold in, this stage shows your coverage across your whole target list and generates one-click LinkedIn searches pre-filtered to <strong>2nd-degree</strong> people at any company you pick. Open the link, skim who shows up, and note the mutual 1st-degree contact who can introduce you.</p>
+
+    <div class="cov" id="coverage"></div>
+
+    <div class="picker">
+      <div class="picker-head">
+        <strong>Build your spot-check list</strong>
+        <span class="hint2">Pick the firms worth a manual 2nd-degree look — usually high-value targets where you have zero or few 1st-degree contacts.</span>
+      </div>
+      <div class="picker-controls">
+        <input type="text" id="firmSearch" placeholder="Type to find a firm… e.g. Prudential, Athene, Voya">
+        <select id="firmFilter">
+          <option value="gaps">Show: gap firms (no 1st-degree)</option>
+          <option value="all" id="allFirmsOpt">Show: all firms</option>
+          <option value="covered">Show: firms I already reach (1st-degree)</option>
+        </select>
+      </div>
+      <div class="firmlist" id="firmlist"></div>
+    </div>
+
+    <div id="worklistWrap" class="hidden">
+      <div class="toolbar">
+        <div class="left" id="wlCount"></div>
+        <button class="btn ghost" id="exportWl">⬇ Export spot-check worklist</button>
+      </div>
+      <table id="wlTbl">
+        <thead>
+          <tr>
+            <th>Target company</th>
+            <th>Your 1st-degree foothold</th>
+            <th>2nd-degree search</th>
+            <th>People found / notes</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="wlBody"></tbody>
+      </table>
+      <p class="note">Tip: the highest-yield 2nd-degree searches are at firms where you already have one 1st-degree contact — that person is almost always the shared connection who can make the intro. Firms with no foothold still work, but you'll be relying on looser mutual connections.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+const ACLI_DEFAULT = [
+      ["5 Star Life Insurance Company",
+      "AAA Life Insurance Company",
+      "Ability Insurance Company",
+      "AGC Life Insurance Company",
+      "Alfa Life Insurance Corporation",
+      "Allianz Life Insurance Company of North America",
+      "Allianz Life Insurance Company of New York",
+      "Amalgamated Life Insurance Company",
+      "American Equity Investment Life Insurance Company",
+      "American Family Life Assurance Company of Columbus (AFLAC)",
+      "American Family Life Insurance Company",
+      "American Fidelity Assurance Company",
+      "American General Life Insurance Company",
+      "American Health and Life Insurance Company",
+      "The American Home Life Insurance Company",
+      "American Income Life Insurance Company",
+      "American Life & Accident Insurance Company of Kentucky",
+      "American National Insurance Company",
+      "American National Life Insurance Company of New York",
+      "American Republic Insurance Company",
+      "American Savings Life Insurance Company",
+      "American United Life Insurance Company",
+      "American-Amicable Life Insurance Company of Texas",
+      "Americo Financial Life and Annuity Insurance Company",
+      "Ameritas Life Insurance Corp.",
+      "Amica Life Insurance Company",
+      "Annuity Investors Life Insurance Company",
+      "Aspida Life Insurance Company",
+      "Assurity Life Insurance Company",
+      "Athene Annuity & Life Assurance Company of New York",
+      "Athene Annuity and Life Company",
+      "Athene Life Insurance Company of New York",
+      "Atlanta Life Insurance Company",
+      "AuguStar Life Insurance Company",
+      "Axcelus Financial Life Insurance Company",
+      "The Baltimore Life Insurance Company",
+      "Bankers Fidelity Life Insurance Company",
+      "Bankers Life and Casualty Company",
+      "Banner Life Insurance Company",
+      "Berkshire Life Insurance Company of America",
+      "Boston Mutual Life Insurance Company",
+      "Brighthouse Life Insurance Company of New York",
+      "Brighthouse Life Insurance Company",
+      "Brooke Life Insurance Company",
+      "Canada Life Reinsurance Company",
+      "Catholic Order of Foresters",
+      "Central Security Life Insurance Company",
+      "Central States Health & Life Co. of Omaha",
+      "Ceres Life Insurance Company",
+      "CICA Life Insurance Company of America",
+      "The Cincinnati Life Insurance Company",
+      "CL Life and Annuity Insurance Company",
+      "Clear Spring Life and Annuity Company",
+      "CM Life Insurance Company",
+      "CMFG Life Insurance Company",
+      "Colonial Life & Accident Insurance Company",
+      "Colonial Penn Life Insurance Company",
+      "Columbian Mutual Life Insurance Company",
+      "Columbus Life Insurance Company",
+      "Combined Insurance Company of America",
+      "Combined Life Insurance Company of New York",
+      "Commonwealth Annuity and Life Insurance Company",
+      "Companion Life Insurance Company",
+      "Companion Life Insurance Company",
+      "Continental General Insurance Company",
+      "Continental Life Insurance Co. of Brentwood, Tennessee",
+      "Country Investors Life Assurance Company",
+      "Country Life Insurance Company",
+      "Delaware Life Insurance Company",
+      "ELCO Mutual Life and Annuity",
+      "EMC National Life Insurance Company",
+      "Empire Fidelity Investments Life Insurance Company",
+      "Employers Reassurance Corporation",
+      "Equitable Financial Life and Annuity Company",
+      "Equitable Financial Life Insurance Company",
+      "Equitable Financial Life Insurance Company of America",
+      "EquiTrust Life Insurance Company",
+      "Erie Family Life Insurance Company",
+      "Everlake Life Insurance Company",
+      "Everly Life Insurance Company",
+      "Family Service Life Insurance Company",
+      "Farm Bureau Life Insurance Company of Michigan",
+      "Farm Bureau Life Insurance Company",
+      "Farmers New World Life Insurance Company",
+      "Federal Life Insurance Company",
+      "Federated Life Insurance Company",
+      "Fidelity & Guaranty Life Insurance Company",
+      "Fidelity Investments Life Insurance Company",
+      "Fidelity Life Association, A Legal Reserve Life Insurance Company",
+      "Fidelity Security Life Insurance Company",
+      "First Allmerica Financial Life Insurance Company",
+      "First Catholic Slovak Ladies Association of the United States of America",
+      "First Penn-Pacific Life Insurance Company",
+      "First Reliance Standard Life Insurance Company",
+      "First Unum Life Insurance Company",
+      "Forethought Life Insurance Company",
+      "Fortitude Life Insurance & Annuity Company",
+      "GBU Financial Life",
+      "General Re Life Corporation",
+      "Genworth Life & Annuity Insurance Company",
+      "Genworth Life Insurance Company",
+      "Gerber Life Insurance Company",
+      "Globe Life and Accident Insurance Company",
+      "Government Personnel Mutual Life Insurance Company",
+      "Grange Life Insurance Company",
+      "Great Southern Life Insurance Company",
+      "Guarantee Trust Life Insurance Company",
+      "Guaranty Income Life Insurance Company",
+      "The Guardian Insurance & Annuity Company Inc.",
+      "The Guardian Life Insurance Company of America",
+      "Hannover Life Reassurance Company of America",
+      "Hartford Life and Accident Insurance Company",
+      "Heritage Life Insurance Company",
+      "Homesteaders Life Company",
+      "Horace Mann Life Insurance Company",
+      "Humana Insurance Company",
+      "Humana Insurance Company of Kentucky",
+      "Ibexis Life & Annuity Insurance Company",
+      "Illinois Mutual Life Insurance Company",
+      "The Independent Order of Foresters",
+      "Integrity Life Insurance Company",
+      "Investors Heritage Life Insurance Company",
+      "Investors Life Insurance Company of North America",
+      "Jackson National Life Insurance Company of New York",
+      "Jackson National Life Insurance Company",
+      "Jefferson National Life Insurance Company",
+      "John Hancock Life & Health Insurance Company",
+      "John Hancock Life Insurance Company of New York",
+      "John Hancock Life Insurance Company (U.S.A.)",
+      "Kansas City Life Insurance Company",
+      "Knights of Columbus",
+      "The Lafayette Life Insurance Company",
+      "Liberty Bankers Life Insurance Company",
+      "Liberty National Life Insurance Company",
+      "Life Insurance Company of the Southwest",
+      "Life of the South Insurance Company",
+      "LifeCare Assurance Company",
+      "LifeSecure Insurance Company",
+      "LifeShield National Insurance Company",
+      "Lincoln Heritage Life Insurance Company",
+      "Lincoln Life & Annuity Company of New York",
+      "The Lincoln National Life Insurance Company",
+      "Loyal Christian Benefit Association",
+      "M Life Insurance Company",
+      "Madison National Life Insurance Company, Inc.",
+      "Massachusetts Mutual Life Insurance Company",
+      "MassMutual Ascend Life Insurance Company",
+      "MEMBERS Life Insurance Company",
+      "Merit Life Insurance Company",
+      "Metropolitan Life Insurance Company",
+      "Metropolitan Tower Life Insurance Company",
+      "Midland National Life Insurance Company",
+      "Midwestern United Life Insurance Company",
+      "Minnesota Life Insurance Company",
+      "MML Bay State Life Insurance Company",
+      "Modern Woodmen of America",
+      "Monitor Life Insurance Company of New York",
+      "Munich American Reassurance Company",
+      "Mutual of America Life Insurance Company",
+      "Mutual of Omaha Insurance Company",
+      "Nassau Life and Annuity Company",
+      "Nassau Life Insurance Company",
+      "National Benefit Life Insurance Company",
+      "National Farm Life Insurance Company",
+      "National Farmers Union Life Insurance Company",
+      "National Guardian Life Insurance Company",
+      "National Integrity Life Insurance Company",
+      "National Life Insurance Company",
+      "National Teachers Associates Life Insurance Company",
+      "Nationwide Life and Annuity Insurance Company",
+      "Nationwide Life Insurance Company",
+      "New England Life Insurance Company",
+      "New Era Life Insurance Company",
+      "New York Life Insurance and Annuity Corporation",
+      "New York Life Insurance Company",
+      "North American Company for Life and Health Insurance",
+      "Northwestern Long Term Care Insurance Company",
+      "The Northwestern Mutual Life Insurance Company",
+      "Oceanview Life and Annuity Company",
+      "Old American Insurance Company",
+      "Optimum Re Insurance Company",
+      "Oxford Life Insurance Company",
+      "Ozark National Life Insurance Company",
+      "Pacific Guardian Life Insurance Company Ltd.",
+      "Pacific Life & Annuity Company",
+      "Pacific Life Insurance Company",
+      "Pan-American Life Insurance Company",
+      "Park Avenue Life Insurance Company",
+      "PartnerRe Life Reinsurance Company of America",
+      "The Paul Revere Life Insurance Company",
+      "Pekin Life Insurance Company",
+      "Penn Insurance and Annuity Company",
+      "The Penn Mutual Life Insurance Company",
+      "Physicians Life Insurance Company",
+      "Pioneer Mutual Life Insurance Company",
+      "Primerica Life Insurance Company",
+      "Principal Financial Group",
+      "Progressive Life Insurance Company",
+      "Protective Life Corporation",
+      "Provident Life and Accident Insurance Company",
+      "Provident Life and Casualty Insurance Company",
+      "Pruco Life Insurance Company",
+      "Pruco Life Insurance Company of New Jersey",
+      "The Prudential Insurance Company of America",
+      "Reliance Standard Life Insurance Company",
+      "ReliaStar Life Insurance Company",
+      "ReliaStar Life Insurance Company of New York",
+      "Renaissance Life & Health Insurance Company of America",
+      "RGA Reinsurance Company",
+      "RiverSource Life Insurance Co. of New York",
+      "RiverSource Life Insurance Company",
+      "Royal Neighbors of America",
+      "S. USA Life Insurance Company, Inc.",
+      "The Savings Bank Mutual Life Insurance Company of Massachusetts",
+      "SBLI USA Life Insurance Company, Inc.",
+      "SCOR Global Life Americas Reinsurance Company",
+      "SCOR Global Life USA Reinsurance Company",
+      "Security Benefit Life Insurance Company",
+      "Security Life of Denver Insurance Company",
+      "Security Mutual Life Insurance Company of New York",
+      "Security National Life Insurance Company",
+      "Selected Funeral & Life Insurance Company",
+      "Senior Life Insurance Company",
+      "Sentry Life Insurance Company",
+      "Shelter Life Insurance Company",
+      "ShelterPoint Insurance Company",
+      "SILAC Insurance Company",
+      "Somerset Reinsurance Company",
+      "Southern Farm Bureau Life Insurance Company",
+      "Standard Insurance Company",
+      "Standard Life and Accident Insurance Company",
+      "State Farm Life and Accident Assurance Company",
+      "State Farm Life Insurance Company",
+      "The State Life Insurance Company",
+      "State Mutual Insurance Company",
+      "Sun Life and Health Insurance Company (U.S.)",
+      "Sun Life Assurance Company of Canada",
+      "Swiss Re Life & Health America Inc.",
+      "Symetra Life Insurance Company",
+      "Talcott Resolution Life and Annuity Insurance Company",
+      "Talcott Resolution Life Insurance Company",
+      "Teachers Insurance and Annuity Association of America",
+      "Texas Life Insurance Company",
+      "Thrivent Financial for Lutherans",
+      "TIAA-CREF Life Insurance Company of New York",
+      "Transamerica Financial Life Insurance Company",
+      "Transamerica Life Insurance Company",
+      "Trusted Fraternal Life",
+      "Trustmark Insurance Company",
+      "Union Fidelity Life Insurance Company",
+      "United American Insurance Company",
+      "United Fidelity Life Insurance Company",
+      "United Heritage Life Insurance Company",
+      "United Home Life Insurance Company",
+      "United Insurance Company of America",
+      "United of Omaha Life Insurance Company",
+      "The United States Life Insurance Company in the City of New York",
+      "Universal Guaranty Life Insurance Company",
+      "Unum Life Insurance Company of America",
+      "USAA Life Insurance Company",
+      "USAble Life Insurance Company",
+      "Vantis Life Insurance Company",
+      "The Variable Annuity Life Insurance Company",
+      "Venerable Insurance & Annuity Company",
+      "Voya Retirement Insurance & Annuity Company",
+      "Washington National Insurance Company",
+      "The Western & Southern Life Insurance Company",
+      "Western United Life Assurance Company",
+      "Western-Southern Life Assurance Company",
+      "Wilcac Life Insurance Company",
+      "William Penn Life Insurance Company of New York",
+      "Wilton Reassurance Company",
+      "Wilton Reassurance Life Insurance Company of New York",
+      "Woodmen of the World Life Insurance Society",
+      "Zurich American Life Insurance Company"]];
+// active company list — starts empty; set by user choice in Stage 1
+let ACLI = [];
+let ACLI_PREP = [];
+let LIST_LABEL = 'companies';
+let LAST_CONN_TEXT = '';
+
+function setCompanyList(names, label){
+  // dedupe + trim + drop blanks
+  const seen = new Set(); const clean = [];
+  for(let n of names){ n=(n||'').trim(); if(!n) continue; const k=n.toLowerCase(); if(seen.has(k)) continue; seen.add(k); clean.push(n); }
+  ACLI = clean;
+  ACLI_PREP = ACLI.map(name => ({ name, toks: tokens(name), core: coreNorm(name) }));
+  LIST_LABEL = label || 'companies';
+  return clean.length;
+}
+
+// ---- normalization ----
+const STOP = ['the','life','insurance','company','companies','co','corp','corporation','inc','incorporated','assurance','annuity','and','of','for','financial','group','ltd','llc','health','accident','reinsurance','reassurance','holdings','usa','us','de','services','agency','agencies'];
+// geographic/weak tokens: count for matching but cannot, alone, justify a match
+const GEO = new Set(['new','york','america','american','national','north','south','of','city']);
+function norm(s){
+  if(!s) return '';
+  let t = s.toLowerCase().replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
+  return t;
+}
+function tokens(s){
+  return norm(s).split(' ').filter(w => w && !STOP.includes(w));
+}
+function coreNorm(s){ return tokens(s).join(' '); }
+
+// similarity: blend of token Jaccard and char bigram dice on core
+function bigrams(s){ const r=[]; for(let i=0;i<s.length-1;i++) r.push(s.substr(i,2)); return r; }
+function dice(a,b){
+  if(!a.length||!b.length) return 0;
+  const A=bigrams(a),B=bigrams(b); const m={}; A.forEach(g=>m[g]=(m[g]||0)+1);
+  let hit=0; B.forEach(g=>{ if(m[g]>0){hit++;m[g]--;} });
+  return (2*hit)/(A.length+B.length);
+}
+function jaccard(a,b){
+  const A=new Set(a),B=new Set(b); if(!A.size||!B.size) return 0;
+  let inter=0; A.forEach(x=>{ if(B.has(x)) inter++; });
+  return inter/(A.size+B.size-inter);
+}
+
+// common LinkedIn single-word brand spellings → expanded form for matching
+const ALIASES = {
+  'massmutual':'massachusetts mutual','metlife':'metropolitan life',
+  'nymph':'new york life','nyl':'new york life','aflac':'american family columbus',
+  'tiaa':'teachers annuity association','tiaacref':'teachers annuity association',
+  'usaa':'usaa','lincolnfinancial':'lincoln national','nationwide':'nationwide',
+  'transamerica':'transamerica','symetra':'symetra','voya':'voya',
+  'principal':'principal','prudential':'prudential','protective':'protective',
+  'genworth':'genworth','thrivent':'thrivent lutherans','primerica':'primerica',
+  'globe':'globe accident','allianz':'allianz','athene':'athene','equitable':'equitable',
+  'guardian':'guardian','penn':'penn','pacific':'pacific','sammons':'midland',
+  'brighthouse':'brighthouse','corebridge':'american general','jackson':'jackson',
+  'mutualofomaha':'mutual omaha','newyorklife':'new york life'
+};
+function applyAlias(s){
+  const key = norm(s).replace(/ /g,'');
+  if(ALIASES[key]) return ALIASES[key];
+  return s;
+}
+
+function bestMatch(company){
+  const expanded = applyAlias(company);
+  const cToks = tokens(expanded), cCore = coreNorm(expanded);
+  if(!cCore || cCore.length < 3) return null;
+  let best=null, bestScore=0;
+  for(const a of ACLI_PREP){
+    if(!a.core) continue;
+    const j = jaccard(cToks, a.toks);
+    const d = dice(cCore.replace(/ /g,''), a.core.replace(/ /g,''));
+    // containment boost — only when the shared core is substantial (>=4 chars
+    // and at least one full token), so "M" or "CM" can't hijack a match
+    let contain = 0;
+    const shorter = cCore.length <= a.core.length ? cCore : a.core;
+    if(a.core === cCore && cCore.length >= 3){ contain = 1; }
+    else if((a.core.includes(cCore) || cCore.includes(a.core)) && shorter.length >= 4
+            && (cToks.some(t => a.toks.includes(t)))){ contain = 0.82; }
+    // require at least one shared MEANINGFUL (non-geographic) token
+    const sharedToken = cToks.some(t => t.length >= 3 && !GEO.has(t) && a.toks.includes(t));
+    let score = Math.max(contain, 0.55*j + 0.45*d);
+    if(!sharedToken && contain < 1) score = Math.min(score, 0.45); // kill geography-only / phantom matches
+    if(score>bestScore){ bestScore=score; best=a; }
+  }
+  return best && bestScore >= 0.5 ? {name: best.name, score: Math.round(bestScore*100)} : null;
+}
+
+// ---- CSV parse ----
+function parseCSV(text){
+  // strip leading "Notes:" block LinkedIn sometimes adds
+  const lines = text.split(/\r?\n/);
+  let start = 0;
+  for(let i=0;i<lines.length;i++){
+    if(/first name/i.test(lines[i]) && /last name/i.test(lines[i])){ start=i; break; }
+  }
+  const body = lines.slice(start).join('\n');
+  const rows=[]; let row=[], cur='', q=false;
+  for(let i=0;i<body.length;i++){
+    const ch=body[i];
+    if(q){
+      if(ch==='"'){ if(body[i+1]==='"'){cur+='"';i++;} else q=false; }
+      else cur+=ch;
+    } else {
+      if(ch==='"') q=true;
+      else if(ch===','){ row.push(cur); cur=''; }
+      else if(ch==='\n'){ row.push(cur); rows.push(row); row=[]; cur=''; }
+      else if(ch==='\r'){}
+      else cur+=ch;
+    }
+  }
+  if(cur.length||row.length){ row.push(cur); rows.push(row); }
+  return rows.filter(r=>r.some(c=>c&&c.trim()));
+}
+
+function ix(headers, ...names){
+  for(const n of names){
+    const i = headers.findIndex(h => h.trim().toLowerCase()===n);
+    if(i>=0) return i;
+  }
+  for(const n of names){
+    const i = headers.findIndex(h => h.trim().toLowerCase().includes(n));
+    if(i>=0) return i;
+  }
+  return -1;
+}
+
+let MATCHES=[], sortKey='score', sortDir=-1;
+
+function process(text){
+  if(!ACLI.length){ alert('Load a target company list first (Stage 1).'); return; }
+  const rows = parseCSV(text);
+  if(rows.length<2){ alert('Could not read any rows. Make sure this is the Connections.csv from your LinkedIn export.'); return; }
+  const H = rows[0];
+  const iF=ix(H,'first name','first'), iL=ix(H,'last name','last'),
+        iC=ix(H,'company','organization'), iP=ix(H,'position','title','headline'),
+        iU=ix(H,'url','profile');
+  MATCHES=[];
+  for(let r=1;r<rows.length;r++){
+    const row=rows[r];
+    const company = iC>=0 ? (row[iC]||'').trim() : '';
+    if(!company) continue;
+    const m = bestMatch(company);
+    if(!m) continue;
+    MATCHES.push({
+      name: ((iF>=0?row[iF]:'')+' '+(iL>=0?row[iL]:'')).trim() || '(no name)',
+      rawCompany: company,
+      matchCompany: m.name,
+      score: m.score,
+      position: iP>=0 ? (row[iP]||'').trim() : '',
+      url: iU>=0 ? (row[iU]||'').trim() : '',
+      degree: 1
+    });
+  }
+  document.getElementById('resultsPanel').classList.remove('hidden');
+  document.getElementById('stage3').classList.remove('hidden');
+  render();
+  renderStage3();
+  document.getElementById('resultsPanel').scrollIntoView({behavior:'smooth'});
+}
+
+function activeThreshold(){ return +document.getElementById('thresh').value; }
+
+function visibleRows(){
+  const th=activeThreshold();
+  const q=document.getElementById('filter').value.toLowerCase().trim();
+  let rows=MATCHES.filter(m=>m.score>=th);
+  if(q) rows=rows.filter(m=> (m.name+' '+m.rawCompany+' '+m.matchCompany+' '+m.position).toLowerCase().includes(q));
+  rows.sort((a,b)=>{
+    let av=a[sortKey], bv=b[sortKey];
+    if(typeof av==='string'){ av=av.toLowerCase(); bv=bv.toLowerCase(); }
+    if(av<bv) return -1*sortDir; if(av>bv) return 1*sortDir; return 0;
+  });
+  return rows;
+}
+
+function render(){
+  const rows=visibleRows();
+  const tb=document.getElementById('tbody'); tb.innerHTML='';
+  document.getElementById('noMatch').classList.toggle('hidden', rows.length>0);
+  for(const m of rows){
+    const tr=document.createElement('tr');
+    const link = m.url ? `<a href="${m.url}" target="_blank" rel="noopener">profile ↗</a>` : '—';
+    tr.innerHTML = `
+      <td class="name">${esc(m.name)}</td>
+      <td>${esc(m.rawCompany)}</td>
+      <td class="match-co">${esc(m.matchCompany)}</td>
+      <td class="conf">${m.score}%<span class="conf-bar" style="width:${Math.round(m.score*0.4)}px"></span></td>
+      <td>${esc(m.position)||'—'}</td>
+      <td><span class="badge b1">1st</span></td>
+      <td class="linkcell">${link}</td>`;
+    tb.appendChild(tr);
+  }
+  // stats
+  const th=activeThreshold();
+  const all=MATCHES.filter(m=>m.score>=th);
+  const firms=new Set(all.map(m=>m.matchCompany));
+  const strong=all.filter(m=>m.score>=90).length;
+  document.getElementById('stats').innerHTML = `
+    <div class="stat"><div class="n">${all.length}</div><div class="l">Contacts matched</div></div>
+    <div class="stat green"><div class="n">${firms.size}</div><div class="l">Target firms reached</div></div>
+    <div class="stat gold"><div class="n">${strong}</div><div class="l">High-confidence (≥90%)</div></div>
+    <div class="stat"><div class="n">${MATCHES.length}</div><div class="l">Total candidates scanned</div></div>`;
+  document.getElementById('count').textContent = `Showing ${rows.length} of ${all.length} matched contacts`;
+  if(typeof renderStage3==='function' && !document.getElementById('stage3').classList.contains('hidden')) renderStage3();
+}
+
+function esc(s){ return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+document.querySelectorAll('thead th[data-k]').forEach(th=>{
+  th.addEventListener('click',()=>{
+    const k=th.dataset.k;
+    if(sortKey===k) sortDir*=-1; else { sortKey=k; sortDir = (k==='score')?-1:1; }
+    render();
+  });
+});
+document.getElementById('thresh').addEventListener('input',e=>{
+  document.getElementById('threshVal').textContent=e.target.value+'%'; render();
+});
+document.getElementById('filter').addEventListener('input',render);
+
+document.getElementById('export').addEventListener('click',()=>{
+  const rows=visibleRows();
+  const head=['Name','Their Company (LinkedIn)','Matched ACLI Member','Match %','Title','Degree','Profile URL'];
+  const csv=[head].concat(rows.map(m=>[m.name,m.rawCompany,m.matchCompany,m.score+'%',m.position,'1st',m.url]))
+    .map(r=>r.map(c=>`"${(c||'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob=new Blob([csv],{type:'text/csv'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='acli_network_matches.csv'; a.click();
+});
+
+// file handling (connections — Stage 2)
+const drop=document.getElementById('drop'), file=document.getElementById('file');
+drop.addEventListener('click',()=>file.click());
+file.addEventListener('change',e=>{ if(e.target.files[0]) read(e.target.files[0]); });
+['dragover','dragenter'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over');}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over');}));
+drop.addEventListener('drop',e=>{ const f=e.dataTransfer.files[0]; if(f) read(f); });
+function read(f){
+  const r=new FileReader();
+  r.onload=()=>{ LAST_CONN_TEXT=r.result; process(r.result); };
+  r.readAsText(f);
+}
+
+// ============ STAGE 1: company-list input ============
+// Parse a pasted/loaded list. Accepts one-per-line OR CSV. For CSV, pick the
+// column most likely to hold company names (header match, else widest text col).
+function parseCompanyList(text){
+  const lines = text.split(/\r?\n/).map(l=>l.replace(/\uFEFF/g,'')).filter(l=>l.trim());
+  if(!lines.length) return [];
+  const looksCSV = lines.slice(0,5).some(l => l.split(',').length >= 2);
+  if(!looksCSV){
+    // plain list: one company per line; strip stray surrounding quotes
+    let out = lines.map(l => l.replace(/^["']|["']$/g,'').trim()).filter(Boolean);
+    // drop a leading line that is just a header word ("Company", "Name", etc.)
+    if(out.length && /^(company|company name|organization|organisation|employer|firm|account|name)$/i.test(out[0])) out = out.slice(1);
+    return out;
+  }
+  // CSV: split rows, find a company column.
+  const rows = lines.map(splitCSVLine);
+  const header = rows[0].map(h=>h.trim().toLowerCase());
+  // A real header cell equals a known label (e.g. "company"), not just contains the word
+  // — so a data row like "Acme Insurance Company" isn't mistaken for a header.
+  const HEAD_CO = /^(company|company name|organization|organisation|employer|firm|account|account name)$/;
+  const HEAD_NAME = /^name$/;
+  let col = header.findIndex(h => HEAD_CO.test(h));
+  let dataStart = 1;
+  if(col < 0) col = header.findIndex(h => HEAD_NAME.test(h));
+  if(col < 0){
+    // no header row — pick the column with the longest total text across all rows
+    dataStart = 0;
+    const widths = {};
+    for(const r of rows){ r.forEach((c,i)=>{ widths[i]=(widths[i]||0)+(c||'').trim().length; }); }
+    let bestCol=0, bestW=-1;
+    for(const i in widths){ if(widths[i]>bestW){ bestW=widths[i]; bestCol=+i; } }
+    col = bestCol;
+  }
+  return rows.slice(dataStart).map(r => (r[col]||'').replace(/^["']|["']$/g,'').trim()).filter(Boolean);
+}
+function splitCSVLine(line){
+  const out=[]; let cur='', q=false;
+  for(let i=0;i<line.length;i++){ const ch=line[i];
+    if(q){ if(ch==='"'){ if(line[i+1]==='"'){cur+='"';i++;} else q=false; } else cur+=ch; }
+    else { if(ch==='"') q=true; else if(ch===','){ out.push(cur); cur=''; } else cur+=ch; }
+  }
+  out.push(cur); return out;
+}
+
+const coDrop=document.getElementById('coDrop'), coFile=document.getElementById('coFile'),
+      coPaste=document.getElementById('coPaste'), coStatus=document.getElementById('coStatus');
+let pendingListText = '';   // text loaded from file, awaiting "Use this list"
+
+coDrop.addEventListener('click',()=>coFile.click());
+coFile.addEventListener('change',e=>{ const f=e.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{ pendingListText=r.result; coPaste.value=r.result; flashStatus('Loaded "'+f.name+'" — click "Use this list".'); };
+  r.readAsText(f);
+});
+['dragover','dragenter'].forEach(ev=>coDrop.addEventListener(ev,e=>{e.preventDefault();coDrop.classList.add('over');}));
+['dragleave','drop'].forEach(ev=>coDrop.addEventListener(ev,e=>{e.preventDefault();coDrop.classList.remove('over');}));
+coDrop.addEventListener('drop',e=>{ const f=e.dataTransfer.files[0]; if(!f) return;
+  const r=new FileReader(); r.onload=()=>{ pendingListText=r.result; coPaste.value=r.result; flashStatus('Loaded "'+f.name+'" — click "Use this list".'); }; r.readAsText(f);
+});
+
+function flashStatus(msg, warn){ coStatus.textContent=msg; coStatus.classList.toggle('warn', !!warn); }
+
+function activateList(names, label){
+  const n = setCompanyList(names, label);
+  if(!n){ flashStatus('No company names found in that input — check the format.', true); return false; }
+  // reveal connections stage; update labels
+  document.getElementById('connPanel').classList.remove('hidden');
+  document.getElementById('kicker').textContent = 'Network Intelligence · ' + n + ' target companies';
+  // if connections were already matched, re-run against the new list
+  if(LAST_CONN_TEXT){ process(LAST_CONN_TEXT); }
+  flashStatus('✓ '+n+' companies loaded. Now load your connections in Stage 2.');
+  document.getElementById('connPanel').scrollIntoView({behavior:'smooth'});
+  return true;
+}
+
+document.getElementById('coUseList').addEventListener('click',()=>{
+  const text = coPaste.value.trim() || pendingListText;
+  if(!text){ flashStatus('Paste a list or choose a file first.', true); return; }
+  activateList(parseCompanyList(text), 'your list');
+});
+document.getElementById('coUseAcli').addEventListener('click',()=>{
+  activateList(ACLI_DEFAULT.slice(), 'ACLI');
+  coPaste.value=''; pendingListText='';
+});
+
+// ============ STAGE 3: 2nd-degree spot-check & coverage ============
+const WORKLIST = new Map(); // firmName -> {note}
+
+// which ACLI firms do I already reach at 1st degree (above current threshold)?
+function reachedFirms(){
+  const th=activeThreshold();
+  const set=new Map(); // firm -> [contact names]
+  for(const m of MATCHES){ if(m.score>=th){ if(!set.has(m.matchCompany)) set.set(m.matchCompany,[]); set.get(m.matchCompany).push(m.name); } }
+  return set;
+}
+
+// build a LinkedIn people-search URL: company keyword + 2nd-degree filter
+function searchURL(firm){
+  // keep keywords clean — drop legal boilerplate that hurts LinkedIn keyword search
+  const kw = firm
+    .replace(/\b(Insurance|Assurance|Company|Corporation|Corp\.?|Incorporated|Inc\.?|Co\.?|of America|of New York|of North America|Ltd\.?|LLC|and Annuity|Life & Health|Life and Health)\b/gi,' ')
+    .replace(/\bThe\b/gi,' ').replace(/[,&]/g,' ').replace(/\s+/g,' ').trim();
+  const q = encodeURIComponent(kw || firm);
+  // network=["S"] => 2nd-degree
+  return `https://www.linkedin.com/search/results/people/?keywords=${q}&network=%5B%22S%22%5D&origin=FACETED_SEARCH`;
+}
+
+function renderStage3(){
+  const reached = reachedFirms();
+  const total = ACLI.length;
+  const reachN = reached.size;
+  const gapN = total - reachN;
+  const pct = Math.round(reachN/total*100);
+
+  document.getElementById('coverage').innerHTML = `
+    <div class="card reach"><div class="big">${reachN}</div><div class="lbl">Firms you reach (1st-degree)</div></div>
+    <div class="card gap"><div class="big">${gapN}</div><div class="lbl">Gap firms (no 1st-degree)</div></div>
+    <div class="card"><div class="big">${pct}%</div><div class="lbl">List coverage</div>
+      <div class="bar"><i style="width:${pct}%"></i></div></div>`;
+
+  const opt=document.getElementById('allFirmsOpt'); if(opt) opt.textContent='Show: all '+total+' companies';
+  renderFirmList();
+  renderWorklist();
+}
+
+function renderFirmList(){
+  const reached = reachedFirms();
+  const q = document.getElementById('firmSearch').value.toLowerCase().trim();
+  const mode = document.getElementById('firmFilter').value;
+  let firms = ACLI.slice().sort();
+  firms = firms.filter(f=>{
+    const isReached = reached.has(f);
+    if(mode==='gaps' && isReached) return false;
+    if(mode==='covered' && !isReached) return false;
+    if(q && !f.toLowerCase().includes(q)) return false;
+    return true;
+  });
+  const box = document.getElementById('firmlist');
+  if(!firms.length){ box.innerHTML='<div class="none">No firms match.</div>'; return; }
+  box.innerHTML = firms.slice(0,400).map(f=>{
+    const isReached = reached.has(f);
+    const checked = WORKLIST.has(f) ? 'checked' : '';
+    const tag = isReached
+      ? `<span class="tag tag-reach">1st ✓ (${reached.get(f).length})</span>`
+      : `<span class="tag tag-gap">gap</span>`;
+    return `<label class="firmrow"><input type="checkbox" data-firm="${esc(f)}" ${checked}>
+      <span class="fn">${esc(f)}</span>${tag}</label>`;
+  }).join('');
+  box.querySelectorAll('input[type=checkbox]').forEach(cb=>{
+    cb.addEventListener('change',()=>{
+      const f=cb.dataset.firm;
+      if(cb.checked){ if(!WORKLIST.has(f)) WORKLIST.set(f,{note:''}); }
+      else WORKLIST.delete(f);
+      renderWorklist();
+    });
+  });
+}
+
+function renderWorklist(){
+  const reached = reachedFirms();
+  const wrap = document.getElementById('worklistWrap');
+  const body = document.getElementById('wlBody');
+  if(!WORKLIST.size){ wrap.classList.add('hidden'); return; }
+  wrap.classList.remove('hidden');
+  body.innerHTML='';
+  for(const [firm,data] of WORKLIST){
+    const foot = reached.has(firm)
+      ? `<span class="foothold-yes">${reached.get(firm).map(esc).join(', ')}</span>`
+      : `<span class="foothold-no">none — looser intro path</span>`;
+    const tr=document.createElement('tr');
+    tr.innerHTML = `
+      <td class="name">${esc(firm)}</td>
+      <td>${foot}</td>
+      <td><a class="srch-link" href="${searchURL(firm)}" target="_blank" rel="noopener">2nd-degree ↗</a></td>
+      <td><textarea class="wl-note" placeholder="Who showed up? Which mutual connection bridges to them?">${esc(data.note)}</textarea></td>
+      <td><button class="wl-rm" title="Remove">×</button></td>`;
+    tr.querySelector('.wl-note').addEventListener('input',e=>{ data.note=e.target.value; });
+    tr.querySelector('.wl-rm').addEventListener('click',()=>{
+      WORKLIST.delete(firm);
+      const cb=document.querySelector(`#firmlist input[data-firm="${cssEsc(firm)}"]`); if(cb) cb.checked=false;
+      renderWorklist();
+    });
+    body.appendChild(tr);
+  }
+  document.getElementById('wlCount').textContent = `${WORKLIST.size} firm${WORKLIST.size>1?'s':''} queued for 2nd-degree spot-check`;
+}
+
+function cssEsc(s){ return s.replace(/(["\\])/g,'\\$1'); }
+
+document.getElementById('firmSearch').addEventListener('input',renderFirmList);
+document.getElementById('firmFilter').addEventListener('change',renderFirmList);
+
+document.getElementById('exportWl').addEventListener('click',()=>{
+  const reached = reachedFirms();
+  const head=['ACLI Firm','1st-degree Foothold (likely introducer)','2nd-degree Search URL','Notes'];
+  const rows=[...WORKLIST].map(([firm,d])=>[
+    firm,
+    reached.has(firm)?reached.get(firm).join('; '):'(none)',
+    searchURL(firm),
+    d.note
+  ]);
+  const csv=[head].concat(rows)
+    .map(r=>r.map(c=>`"${(c||'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob=new Blob([csv],{type:'text/csv'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='acli_2nd_degree_worklist.csv'; a.click();
+});
+</script>
+</body>
+</html>
