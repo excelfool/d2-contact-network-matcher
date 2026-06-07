@@ -624,10 +624,23 @@ const WEAK = new Set([
   'pacific','continental','colonial','security','liberty','equitable','integrity','heritage',
   'fidelity','global','senior','old','pioneer','companion','family','mutual','benefit',
   'guardian','grange','sentry','shelter','union','premier','select','capital',
-  'investment','retirement','savings','trust','bank','banque','financial','partners','solutions',
+  'investment','investments','retirement','savings','trust','bank','banque','financial','partners','solutions',
   'international','university','college','school','government','administration','department','office',
-  'group','holdings','global','asset','management','advisors','advisers','consulting','realty',
-  'commonwealth','foreign','development','exchange','reserve','bureau','council','association'
+  'group','holdings','asset','management','advisors','advisers','consulting','realty',
+  'commonwealth','foreign','development','exchange','reserve','bureau','council','association',
+  'equity','ventures','enterprises','industries','systems','technologies','digital',
+  'health','accident','annuities','assurance','services','agency'
+]);
+// Geographic/place tokens AND common ambiguous words: distinctive enough to *help*
+// a match, but a single one shared alone must NOT confirm a match on its own
+// ("Bank of England" vs "New England Life", "Our Home" vs "United Home Life").
+const PLACE = new Set([
+  'england','boston','massachusetts','dallas','chicago','denver','omaha','iowa','michigan',
+  'illinois','minnesota','kansas','nebraska','tennessee','kentucky','jersey','london','baltimore',
+  'columbus','cincinnati','delaware','maryland','oregon','ohio','indiana','wisconsin','georgia',
+  'carolina','virginia','washington','oklahoma','arizona','colorado','missouri','arkansas',
+  'home','star','equity','crest','summit','vantage','horizon','heritage','legacy','liberty',
+  'sterling','phoenix','eagle','crown','royal','empire','metro','metropolitan'
 ]);
 // Words that signal the contact actually works in insurance/financial services.
 const FIN = new Set([
@@ -686,6 +699,25 @@ function bestMatch(company){
       score -= 0.12 * unmatchedContactStrong;
       // Small reward if the contact looks like a financial-services firm.
       if(cHasFin) score += 0.05;
+
+      // --- SINGLE-SHARED-TOKEN COINCIDENCE GUARD ---
+      // When the whole match rests on exactly ONE shared strong token, it's only
+      // trustworthy if the contact name is essentially THAT word (e.g. "Prudential"
+      // → Prudential). If the contact has other strong words the firm lacks, the
+      // single overlap is likely coincidental ("Bank of England" vs "New England
+      // Life", "LTS Investments" vs "Fidelity Investments", "Univ. of Massachusetts"
+      // vs "Massachusetts Mutual"). Cap such matches below the confident band.
+      if(sharedStrong.length === 1){
+        const tok = sharedStrong[0];
+        const contactIsJustToken = cStrong.length === 1 && cToks.length <= 2;
+        if(PLACE.has(tok)){
+          // a lone shared place name almost never identifies the same company
+          score = Math.min(score, 0.55);
+        } else if(!contactIsJustToken){
+          // shared one word but the contact clearly names a different entity
+          score = Math.min(score, 0.6);
+        }
+      }
     }
 
     score = Math.max(0, Math.min(1, score));
