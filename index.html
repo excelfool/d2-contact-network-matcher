@@ -186,8 +186,8 @@
       <div class="ctl">
         <label>Match strictness</label>
         <div style="display:flex;align-items:center;gap:10px;">
-          <input type="range" id="thresh" min="55" max="100" value="80">
-          <span class="val" id="threshVal">80%</span>
+          <input type="range" id="thresh" min="50" max="100" value="85">
+          <span class="val" id="threshVal">85%</span>
         </div>
       </div>
       <div class="searchbox">
@@ -615,27 +615,86 @@ function applyAlias(s){
   return s;
 }
 
+// Weak/generic tokens: shared ONLY on these is not enough for a confident match.
+// Geographic terms, common corporate adjectives, and industry-generic words.
+const WEAK = new Set([
+  'new','york','america','american','national','north','south','east','west','city','state',
+  'standard','texas','canada','federal','atlanta','investors','associates','reliance',
+  'independent','provident','united','western','southern','central','first','general',
+  'pacific','continental','colonial','security','liberty','equitable','integrity','heritage',
+  'fidelity','global','senior','old','pioneer','companion','family','mutual','benefit',
+  'guardian','grange','sentry','shelter','union','premier','select','capital',
+  'investment','retirement','savings','trust','bank','banque','financial','partners','solutions',
+  'international','university','college','school','government','administration','department','office',
+  'group','holdings','global','asset','management','advisors','advisers','consulting','realty',
+  'commonwealth','foreign','development','exchange','reserve','bureau','council','association'
+]);
+// Words that signal the contact actually works in insurance/financial services.
+const FIN = new Set([
+  'insurance','life','annuity','assurance','reinsurance','reassurance','mutual','financial',
+  'underwriting','actuary','actuarial','annuities','insurer','benefits','retirement','wealth'
+]);
+
+function strongToks(toks){ return toks.filter(t => t.length >= 4 && !WEAK.has(t)); }
+
 function bestMatch(company){
   const expanded = applyAlias(company);
   const cToks = tokens(expanded), cCore = coreNorm(expanded);
   if(!cCore || cCore.length < 3) return null;
-  let best=null, bestScore=0;
+  const cStrong = strongToks(cToks);
+  const cHasFin = cToks.some(t => FIN.has(t));
+
+  let best=null, bestScore=0, bestShared=0;
   for(const a of ACLI_PREP){
     if(!a.core) continue;
-    const j = jaccard(cToks, a.toks);
-    const d = dice(cCore.replace(/ /g,''), a.core.replace(/ /g,''));
-    // containment boost — only when the shared core is substantial (>=4 chars
-    // and at least one full token), so "M" or "CM" can't hijack a match
-    let contain = 0;
-    const shorter = cCore.length <= a.core.length ? cCore : a.core;
-    if(a.core === cCore && cCore.length >= 3){ contain = 1; }
-    else if((a.core.includes(cCore) || cCore.includes(a.core)) && shorter.length >= 4
-            && (cToks.some(t => a.toks.includes(t)))){ contain = 0.82; }
-    // require at least one shared MEANINGFUL (non-geographic) token
-    const sharedToken = cToks.some(t => t.length >= 3 && !GEO.has(t) && a.toks.includes(t));
-    let score = Math.max(contain, 0.55*j + 0.45*d);
-    if(!sharedToken && contain < 1) score = Math.min(score, 0.45); // kill geography-only / phantom matches
-    if(score>bestScore){ bestScore=score; best=a; }
+
+    // 1) Exact normalized-name match → always top confidence.
+    if(a.core === cCore){ if(1 > bestScore){ bestScore=1; best=a; bestShared=cToks.length; } continue; }
+
+    const aStrong = strongToks(a.toks);
+    const sharedAll = cToks.filter(t => a.toks.includes(t));
+    const sharedStrong = cStrong.filter(t => aStrong.includes(t));
+
+    // Must share at least one token at all.
+    if(!sharedAll.length) continue;
+
+    // 2) Score from shared *distinctive* tokens, as a fraction of the firm's
+    //    distinctive tokens (so matching "Prudential" out of "The Prudential
+    //    Insurance Company of America" is strong, since "prudential" is its only
+    //    distinctive token).
+    const aStrongCount = aStrong.length || 1;
+    const strongCoverage = sharedStrong.length / aStrongCount;       // how much of the firm we matched
+    const d = dice(cCore.replace(/ /g,''), a.core.replace(/ /g,'')); // char-level similarity, tie-breaker
+
+    let score;
+    if(sharedStrong.length === 0){
+      // Only weak/generic tokens shared (e.g. "state", "standard", "canada").
+      // This is the false-positive zone. Cap hard, and require a financial
+      // signal on the contact side to even register.
+      score = cHasFin ? 0.5 : 0.3;
+    } else {
+      // Real distinctive overlap. Base on coverage, blended with char similarity
+      // and how much of BOTH names the shared tokens cover (favours fuller matches).
+      const denom = Math.max(cToks.length, a.toks.length) || 1;
+      const allCoverage = sharedAll.length / denom;
+      score = 0.55 * strongCoverage + 0.25 * allCoverage + 0.20 * d;
+      // Bonus when we matched ALL the firm's distinctive tokens.
+      if(sharedStrong.length === aStrong.length) score += 0.15;
+      // Penalty for strong tokens on the CONTACT side that the firm lacks —
+      // signals a different entity ("Standard Chartered" vs "Standard Insurance").
+      const unmatchedContactStrong = cStrong.filter(t => !aStrong.includes(t)).length;
+      score -= 0.12 * unmatchedContactStrong;
+      // Small reward if the contact looks like a financial-services firm.
+      if(cHasFin) score += 0.05;
+    }
+
+    score = Math.max(0, Math.min(1, score));
+    if(score > bestScore + 1e-9){ bestScore = score; best = a; bestShared = sharedAll.length; }
+    else if(Math.abs(score - bestScore) <= 1e-9 && best){
+      // tie-break: prefer the firm that shares MORE tokens overall (fuller name match),
+      // which disambiguates e.g. "Penn Mutual" → Penn Mutual (2 shared) over Colonial Penn (1).
+      if(sharedAll.length > bestShared){ best = a; bestShared = sharedAll.length; }
+    }
   }
   return best && bestScore >= 0.5 ? {name: best.name, score: Math.round(bestScore*100)} : null;
 }
